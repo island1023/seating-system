@@ -28,12 +28,12 @@
     <h2 class="text-center mb-4 text-primary">班级座位管理系统</h2>
 
     <div id="alert-container">
-        <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
-            <span th:text="${successMessage ?: '操作成功'}"></span>
+        <div th:if="${not #strings.isEmpty(successMessage)}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <span th:text="${successMessage}"></span>
             <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
         </div>
-        <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
-            <span th:text="${errorMessage ?: '操作失败'}"></span>
+        <div th:if="${not #strings.isEmpty(errorMessage)}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <span th:text="${errorMessage}"></span>
             <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
         </div>
     </div>
@@ -54,8 +54,7 @@
                 <div class="form-group">
                     <label for="usernameLogin">用户名</label>
                     <input type="text" class="form-control" id="usernameLogin" name="username"
-                           th:value="${#vars.get('username') ?: ''}" required>
-                </div>
+                           th:value="${username ?: ''}" required> </div>
                 <div class="form-group">
                     <label for="passwordLogin">密码</label>
                     <input type="password" class="form-control" id="passwordLogin" name="password" required>
@@ -76,8 +75,7 @@
                 </div>
                 <div class="form-group">
                     <label for="passwordReg">密码</label>
-                    <input type="password" class="form-control" id="passwordReg" th:field="*{password}" required>
-                </div>
+                    <input type="password" class="form-control" id="passwordReg" name="password" required> </div>
                 <button type="submit" class="btn btn-success btn-block">注册账号</button>
             </form>
         </div>
