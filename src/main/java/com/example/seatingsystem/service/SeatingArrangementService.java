@@ -16,6 +16,10 @@ public interface SeatingArrangementService {
      * 核心算法：生成随机座位排布
      */
     SeatingResult randomArrange(Long classId);
+    /**
+     * 根据行数和列数，生成一个空的 SeatingResult 结构
+     */
+    SeatingResult generateEmptyLayout(Long classId, int rows, int cols);
 
     /**
      * 保存当前排座结果的快照

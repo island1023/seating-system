@@ -167,6 +167,27 @@ public class SeatingArrangementServiceImpl implements SeatingArrangementService 
         return seatingRecordRepository.save(record);
     }
 
+
+    // SeatingArrangementServiceImpl.java (新增 generateEmptyLayout 方法)
+
+    @Override
+    public SeatingResult generateEmptyLayout(Long classId, int rows, int cols) {
+        List<SeatingPosition> layout = new ArrayList<>();
+
+        for (int r = 1; r <= rows; r++) {
+            for (int c = 1; c <= cols; c++) {
+                // 创建空座位：student=null
+                layout.add(new SeatingPosition(r, c, null));
+            }
+        }
+
+        SeatingResult result = new SeatingResult();
+        result.setRows(rows);
+        result.setCols(cols);
+        result.setLayout(layout);
+        return result;
+    }
+
     @Override
     public List<SeatingRecord> getRecordsByClassId(Long classId) {
         return seatingRecordRepository.findByClassIdOrderByCreateTimeDesc(classId);

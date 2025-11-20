@@ -3,11 +3,9 @@ package com.example.seatingsystem.controller;
 import com.example.seatingsystem.entity.SeatingRecord;
 import com.example.seatingsystem.model.SeatingResult;
 import com.example.seatingsystem.service.SeatingArrangementService;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.ui.Model;
 
 import java.util.List;
@@ -23,25 +21,24 @@ public class SeatingController {
         this.seatingArrangementService = seatingArrangementService;
     }
 
-    // 假设您在前端设置布局的接口是 /seating/layout/update
-    // SeatingController.java (updateLayout 方法)
-
+    /**
+     * 处理设置布局请求 (POST /seating/layout/update)
+     * ❗ 核心修正：返回 JSON 数据，让前端 AJAX 渲染空座位图。
+     */
     @PostMapping("/layout/update")
-    public String updateLayout(@RequestParam Long classId,
-                               @RequestParam int rows,
-                               @RequestParam int cols,
-                               @RequestParam int rowSpacing, // ❗ 新增参数
-                               @RequestParam int colSpacing, // ❗ 新增参数
-                               RedirectAttributes redirectAttributes) {
-        try {
-            // ❗ 修正：调用 service 时传入所有参数
-            seatingArrangementService.updateLayout(classId, rows, cols, rowSpacing, colSpacing);
-            redirectAttributes.addFlashAttribute("successMessage", "座位布局设置成功！");
-        } catch (RuntimeException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-        }
-        // 修正：重定向回班级详情页 /class/{classId}
-        return "redirect:/class/" + classId;
+    @ResponseBody // ❗ 关键：返回 JSON 数据
+    public SeatingResult updateLayout(@RequestParam Long classId,
+                                      @RequestParam int rows,
+                                      @RequestParam int cols,
+                                      @RequestParam int rowSpacing,
+                                      @RequestParam int colSpacing) {
+
+        // 1. 调用 Service 逻辑，保存布局和间距信息 (Service 负责验证座位数是否足够)
+        seatingArrangementService.updateLayout(classId, rows, cols, rowSpacing, colSpacing);
+
+        // 2. 返回空的布局结构，让前端 AJAX 接收并渲染空白座位网格
+        // 假设 SeatingArrangementService 中已新增 generateEmptyLayout 方法
+        return seatingArrangementService.generateEmptyLayout(classId, rows, cols);
     }
 
     /**
