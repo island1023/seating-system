@@ -16,9 +16,21 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
      * @return 学生列表
      */
     List<Student> findByClassIdAndIsActiveTrue(Long classId);
+    /**
+     * 查找某一班级的所有活跃学生，并按学号升序排列 (修正点)
+     * @param classId 班级ID
+     * @return 学生列表
+     */
+    //  增加 OrderByStudentNoAsc 后缀，Spring Data JPA 会自动实现排序
+    List<Student> findByClassIdAndIsActiveTrueOrderByStudentNoAsc(Long classId);
 
     /**
      * 检查某一班级下的学号是否已存在（用于导入和手动添加校验）
      */
     Optional<Student> findByClassIdAndStudentNo(Long classId, String studentNo);
+
+    /**
+     * 根据学生ID进行物理删除（硬删除）
+     */
+    void deleteById(Long id); // JpaRepository 已经自带，但我们可以在 Service 层调用
 }

@@ -32,6 +32,102 @@ public class Student {
     @Column(name = "create_time", updatable = false)
     private LocalDateTime createTime;
 
-    // --- 构造函数, Getters and Setters (省略，结构与 User.java 类似) ---
-    // (请自行添加这些方法以确保代码完整性)
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
+
+    // --- 构造函数 ---
+    public Student() {}
+
+    // ---------------------------------------------
+    // --- 完整的 Getters and Setters (修复缺失部分) ---
+    // ---------------------------------------------
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getClassId() {
+        return classId;
+    }
+
+    public void setClassId(Long classId) {
+        this.classId = classId;
+    }
+
+    public String getStudentNo() {
+        return studentNo;
+    }
+
+    public void setStudentNo(String studentNo) {
+        this.studentNo = studentNo;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    // 🎯 补充：Gender 的 Getter/Setter
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    // 🎯 补充：CustomInfo 的 Getter/Setter
+    public String getCustomInfo() {
+        return customInfo;
+    }
+
+    public void setCustomInfo(String customInfo) {
+        this.customInfo = customInfo;
+    }
+
+    // 🎯 补充：IsActive 的 Getter/Setter (注意布尔类型的 Getter 通常是 getXxx 或 isXxx)
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    // --- 时间戳 Getters/Setters ---
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    // --- JPA 生命周期回调 ---
+    @PrePersist
+    protected void onCreate() {
+        this.createTime = LocalDateTime.now();
+        this.updateTime = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updateTime = LocalDateTime.now();
+    }
 }

@@ -2,6 +2,7 @@ package com.example.seatingsystem.service;
 
 import com.example.seatingsystem.entity.User;
 import java.util.Optional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 public interface UserService {
 
@@ -26,4 +27,8 @@ public interface UserService {
      * @return 包含用户对象的Optional
      */
     Optional<User> findById(Long id);
+    /**
+     * 更新用户基本信息和密码
+     */
+    User updateUser(User updatedUser, String newPassword, String oldPassword, PasswordEncoder passwordEncoder);
 }

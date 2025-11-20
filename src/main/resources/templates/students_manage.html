@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${classroom.name} + ' - 学生信息管理'">学生信息管理</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        /* 确保自定义信息可以自由换行 */
+        .table-responsive td {
+            white-space: normal !important;
+        }
+
+        /* 宽度定义：1/6 约等于 16.67%, 2/6 约等于 33.33% */
+        .col-unit-1 {
+            width: 16.67% !important;
+        }
+        .col-unit-2 {
+            width: 33.33% !important;
+        }
+
+        /* 确保操作按钮水平排列 */
+        .action-group {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" th:href="@{/class/{id}(id=${classroom.id})}">« 返回座位面板</a>
+    <span class="navbar-text text-light ml-3">
+            当前班级: <strong th:text="${classroom.name}"></strong>
+        </span>
+</nav>
+
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">
+        学生信息管理
+        <span class="badge badge-secondary" th:text="${'总数: ' + students.size()}"></span>
+    </h1>
+    <hr>
+
+    <div th:if="${successMessage}" class="alert alert-success"><span th:text="${successMessage}"></span></div>
+    <div th:if="${errorMessage}" class="alert alert-danger"><span th:text="${errorMessage}"></span></div>
+
+    <div class="row">
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white">批量导入学生 (Excel)</div>
+                <div class="card-body">
+                    <form th:action="@{/student/import}" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="classId" th:value="${classroom.id}">
+                        <div class="form-group">
+                            <label for="excelFile">Excel 文件 (.xlsx)</label>
+                            <input type="file" class="form-control-file" id="excelFile" name="file" required>
+                            <small class="form-text text-muted">格式要求：第一列(学号), 第二列(姓名), 第三列(性别), 第四列(自定义信息)</small>
+                        </div>
+                        <button type="submit" class="btn btn-info btn-block">导入(重复覆盖)/追加</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">手动添加单个学生</div>
+                <div class="card-body">
+                    <form th:action="@{/student/add}" th:object="${newStudent}" method="post">
+
+                        <input type="hidden" name="classId" th:value="${classroom.id}">
+
+                        <div class="form-group">
+                            <label for="studentNo">学号</label>
+                            <input type="text" class="form-control" id="studentNo" th:field="*{studentNo}" required>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="studentName">姓名</label>
+                            <input type="text" class="form-control" id="studentName" th:field="*{name}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="studentGender">性别</label>
+                            <select class="form-control" id="studentGender" th:field="*{gender}">
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customInfo">自定义信息</label>
+                            <textarea class="form-control" id="customInfo" th:field="*{customInfo}"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">添加学生</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">学生列表</h5>
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead>
+                        <tr>
+                            <th class="col-unit-1">学号</th>
+                            <th class="col-unit-1">姓名</th>
+                            <th class="col-unit-1">性别</th>
+                            <th class="col-unit-2">自定义信息</th>
+                            <th class="col-unit-1">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="student : ${students}">
+                            <td th:text="${student.studentNo}" class="col-unit-1">2023001</td>
+                            <td th:text="${student.name}" class="col-unit-1">张三</td>
+                            <td th:text="${student.gender}" class="col-unit-1">男</td>
+                            <td th:text="${student.customInfo}" class="col-unit-2">很长的自定义信息内容，现在有足够的空间显示</td>
+                            <td class="col-unit-1">
+                                <div class="action-group">
+                                    <button class="btn btn-sm btn-outline-secondary edit-btn"
+                                            data-toggle="modal"
+                                            data-target="#editStudentModal">
+                                        编辑
+                                    </button>
+                                    <a th:href="@{/student/delete/{id}(id=${student.id}, classId=${classroom.id})}"
+                                       onclick="return confirm('确认删除学生 ' + this.parentNode.parentNode.parentNode.children[1].innerText + ' 吗？')"
+                                       class="btn btn-sm btn-outline-danger">删除</a>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editStudentModal" tabindex="-1" role="dialog" aria-labelledby="editStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editStudentModalLabel">编辑学生信息</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <form th:action="@{/student/update}" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="editStudentId">
+                    <input type="hidden" name="classId" th:value="${classroom.id}">
+
+                    <div class="form-group">
+                        <label for="editStudentNo">学号</label>
+                        <input type="text" class="form-control" id="editStudentNo" name="studentNo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStudentName">姓名</label>
+                        <input type="text" class="form-control" id="editStudentName" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStudentGender">性别</label>
+                        <select class="form-control" id="editStudentGender" name="gender">
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCustomInfo">自定义信息</label>
+                        <textarea class="form-control" id="editCustomInfo" name="customInfo"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script>
+    // 监听所有带有 'edit-btn' 类名的按钮点击事件
+    document.querySelectorAll('.edit-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('tr'); // 获取当前行
+
+            // 提取数据：根据列索引 (0:学号, 1:姓名, 2:性别, 3:自定义信息)
+            const studentNo = row.children[0].innerText.trim();
+            const name = row.children[1].innerText.trim();
+            const gender = row.children[2].innerText.trim();
+            const customInfo = row.children[3].innerText.trim();
+
+            // 提取学生 ID：从删除链接中获取 ID
+            const deleteLink = row.querySelector('.btn-outline-danger');
+            // 链接格式: /student/delete/{id}?classId=X
+            const studentId = deleteLink.href.split('/student/delete/')[1].split('?')[0];
+
+            // 填充模态框表单
+            document.getElementById('editStudentId').value = studentId;
+            document.getElementById('editStudentNo').value = studentNo;
+            document.getElementById('editStudentName').value = name;
+            document.getElementById('editCustomInfo').value = customInfo;
+            document.getElementById('editStudentGender').value = gender; // 自动选中正确的性别
+        });
+    });
+</script>
+
+</body>
+</html>

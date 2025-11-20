@@ -47,6 +47,35 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public User updateUser(User updatedUser, String newPassword, String oldPassword, PasswordEncoder passwordEncoder) {
+        // 1. 获取数据库中已存在的用户
+        User existingUser = userRepository.findById(updatedUser.getId())
+                .orElseThrow(() -> new RuntimeException("用户不存在。"));
+
+        // 2. 校验旧密码 (如果用户尝试修改密码)
+        if (newPassword != null && !newPassword.trim().isEmpty()) {
+            if (!passwordEncoder.matches(oldPassword, existingUser.getPassword())) {
+                throw new RuntimeException("旧密码输入不正确。");
+            }
+            // 设置新密码并加密
+            existingUser.setPassword(passwordEncoder.encode(newPassword));
+        }
+
+        // 3. 校验用户名是否冲突
+        if (!existingUser.getUsername().equals(updatedUser.getUsername())) {
+            if (userRepository.findByUsername(updatedUser.getUsername()).isPresent()) {
+                throw new RuntimeException("用户名 [" + updatedUser.getUsername() + "] 已被占用。");
+            }
+            existingUser.setUsername(updatedUser.getUsername());
+        }
+
+        // 4. 更新真实姓名
+        existingUser.setRealName(updatedUser.getRealName());
+
+        return userRepository.save(existingUser);
+    }
+    @Override
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
