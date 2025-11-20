@@ -11,17 +11,10 @@ import java.util.Optional;
 public interface StudentRepository extends JpaRepository<Student, Long> {
 
     /**
-     * 查找某一班级的所有学生
+     * 查找某一班级的所有活跃学生，并按学号升序排列 (已修正并移除冗余方法)
      * @param classId 班级ID
      * @return 学生列表
      */
-    List<Student> findByClassIdAndIsActiveTrue(Long classId);
-    /**
-     * 查找某一班级的所有活跃学生，并按学号升序排列 (修正点)
-     * @param classId 班级ID
-     * @return 学生列表
-     */
-    //  增加 OrderByStudentNoAsc 后缀，Spring Data JPA 会自动实现排序
     List<Student> findByClassIdAndIsActiveTrueOrderByStudentNoAsc(Long classId);
 
     /**

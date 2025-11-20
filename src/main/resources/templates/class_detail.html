@@ -124,11 +124,11 @@
                     </div>
                     <div class="form-group">
                         <label for="rowSpacing">行间距 (像素)</label>
-                        <input type="number" class="form-control" id="rowSpacing" name="rowSpacing" th:value="${classroom.rowSpacing ?: 15}" min="5" required>
+                        <input type="number" class="form-control" id="rowSpacing" name="rowSpacing" th:value="${classroom.rowSpacing != null ? classroom.rowSpacing : 15}" min="5" required>
                     </div>
                     <div class="form-group">
                         <label for="colSpacing">列间距 (像素)</label>
-                        <input type="number" class="form-control" id="colSpacing" name="colSpacing" th:value="${classroom.colSpacing ?: 15}" min="5" required>
+                        <input type="number" class="form-control" id="colSpacing" name="colSpacing" th:value="${classroom.colSpacing != null ? classroom.colSpacing : 15}" min="5" required>
                     </div>
                     <p class="text-danger">当前班级有 <strong id="studentCountDisplay">[[${studentCount ?: 0}]]</strong> 位学生。</p>
                 </div>

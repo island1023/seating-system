@@ -80,8 +80,25 @@ public class ClassroomController {
             return "redirect:/home";
         }
 
+        // 【修正点 1】：确保 rowSpacing 和 colSpacing 字段非空，以防止 Thymeleaf 渲染时对 null Integer 尝试进行操作而导致的 500 错误。
+        // 对于数据库中新增字段为 NULL 的老班级数据尤其重要。
+        if (classroom.getRowSpacing() == null) {
+            classroom.setRowSpacing(15);
+        }
+        if (classroom.getColSpacing() == null) {
+            classroom.setColSpacing(15);
+        }
+
         // 获取该班级的学生数量（用于前端展示，尽管在 home.html 中实现更方便）
-        int studentCount = studentService.getActiveStudentsByClassId(classId).size();
+        int studentCount = 0; // 默认设置为 0
+
+        try {
+            // 保留上次添加的 try-catch，以增强数据访问的健壮性
+            studentCount = studentService.getActiveStudentsByClassId(classId).size();
+        } catch (Exception e) {
+            // 如果获取学生数量失败，设置错误消息并继续加载页面
+            model.addAttribute("errorMessage", "获取学生人数失败，排座功能可能受到影响。错误详情: " + e.getMessage());
+        }
 
         model.addAttribute("classroom", classroom);
         model.addAttribute("studentCount", studentCount);
