@@ -16,7 +16,6 @@
         .seating-grid {
             display: grid;
             grid-template-columns: repeat(var(--cols), 1fr);
-            /* 使用两个不同的 CSS 变量控制间距 */
             grid-row-gap: var(--row-gap, 15px);
             grid-column-gap: var(--col-gap, 15px);
             margin: 20px auto;
@@ -114,14 +113,19 @@
             <form th:action="@{/seating/layout/update}" method="post">
                 <div class="modal-body">
                     <input type="hidden" name="classId" th:value="${classroom.id}">
+
                     <div class="form-group">
                         <label for="rows">行数 (Rows)</label>
-                        <input type="number" class="form-control" id="rows" name="rows" min="1" required th:value="${classroom.seatLayout ? #json.parse(classroom.seatLayout).rows : 0}">
+                        <input type="number" class="form-control" id="rows" name="rows" min="1" required
+                               th:value="${layoutRows}">
                     </div>
+
                     <div class="form-group">
                         <label for="cols">列数 (Cols)</label>
-                        <input type="number" class="form-control" id="cols" name="cols" min="1" required th:value="${classroom.seatLayout ? #json.parse(classroom.seatLayout).cols : 0}">
+                        <input type="number" class="form-control" id="cols" name="cols" min="1" required
+                               th:value="${layoutCols}">
                     </div>
+
                     <div class="form-group">
                         <label for="rowSpacing">行间距 (像素)</label>
                         <input type="number" class="form-control" id="rowSpacing" name="rowSpacing" th:value="${classroom.rowSpacing != null ? classroom.rowSpacing : 15}" min="5" required>
@@ -148,6 +152,7 @@
 
 <script th:inline="javascript">
     /*<![CDATA[*/
+    // 假设 Controller 已经正确传入 layoutRows 和 layoutCols
     const classId = [[${classroom.id}]];
     const seatingGridContainer = $('#seatingGridContainer');
 
@@ -158,7 +163,7 @@
         const rows = result.rows;
         const cols = result.cols;
 
-        // ❗ 修正：从输入框中获取最新的间距值，确保实时渲染效果
+        // 从输入框中获取最新的间距值，确保实时渲染效果
         const rowSpacing = $('#rowSpacing').val() || 20;
         const colSpacing = $('#colSpacing').val() || 20;
 
@@ -177,7 +182,7 @@
                 const gender = position && position.gender ? position.gender : '空';
                 const studentId = position && position.studentId ? position.studentId : 0;
 
-                // ❗ 单元格结构 (拖拽对象)
+                // 单元格结构 (拖拽对象)
                 gridHtml += `<div class="seat-cell gender-${gender}"
                           data-row="${r}" data-col="${c}" data-id="${studentId}"
                           data-gender="${gender}" data-name="${studentName}">
@@ -189,7 +194,7 @@
         gridHtml += '</div>';
         seatingGridContainer.html(gridHtml);
 
-        // ❗ 激活拖拽功能 (SortableJS)
+        // 激活拖拽功能 (SortableJS)
         new Sortable(document.querySelector('.seating-grid'), {
             animation: 150,
             draggable: '.seat-cell',
@@ -199,7 +204,7 @@
             }
         });
 
-        // ❗ 实现不规则座位：双击删除座位框
+        // 实现不规则座位：双击删除座位框
         document.querySelectorAll('.seat-cell').forEach(cell => {
             cell.addEventListener('dblclick', function() {
                 // 修正：增加不能删除空座的逻辑

@@ -54,7 +54,7 @@
                         <span th:text="${studentCounts != null ? studentCounts.get(classroom.id) : 0}">0</span>
                     </p>
 
-                    <a th:href="@{/class/{classId}/students(classId=${classroom.id})}" class="btn btn-sm btn-success">
+                    <a th:href="@{/class/{classId}(classId=${classroom.id})}" class="btn btn-sm btn-success">
                         进入管理
                     </a>
                     <button class="btn btn-sm btn-outline-secondary float-right">编辑</button>

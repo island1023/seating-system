@@ -24,9 +24,10 @@ public class StudentServiceImpl implements StudentService {
         this.studentRepository = studentRepository;
     }
 
+    // StudentServiceImpl.java (getActiveStudentsByClassId 方法)
     @Override
     public List<Student> getActiveStudentsByClassId(Long classId) {
-        // 使用带排序的方法名
+        // 确保使用 Repository 中唯一且正确的方法名
         return studentRepository.findByClassIdAndIsActiveTrueOrderByStudentNoAsc(classId);
     }
 
@@ -172,12 +173,10 @@ public class StudentServiceImpl implements StudentService {
         }
 
         // 3. 更新字段 (只更新允许用户修改的字段)
-        // 注意：班级ID和创建时间不应在此处修改
         existingStudent.setStudentNo(student.getStudentNo());
         existingStudent.setName(student.getName());
         existingStudent.setGender(student.getGender());
         existingStudent.setCustomInfo(student.getCustomInfo());
-        // updateTime 会在 @PreUpdate 中自动更新
 
         return studentRepository.save(existingStudent);
     }
@@ -186,12 +185,11 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     public void deleteStudentById(Long studentId) {
         // 1. 查找学生
-        Student studentToDelete = studentRepository.findById(studentId)
+        studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("学生 ID:" + studentId + " 不存在，无法删除。"));
 
+        // 2. 硬删除（物理删除）
         studentRepository.deleteById(studentId);
 
     }
-
-
 }

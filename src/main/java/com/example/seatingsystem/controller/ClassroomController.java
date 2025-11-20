@@ -2,7 +2,8 @@ package com.example.seatingsystem.controller;
 
 import com.example.seatingsystem.entity.Classroom;
 import com.example.seatingsystem.service.ClassroomService;
-import com.example.seatingsystem.service.StudentService; // 用于班级详情页统计学生
+import com.example.seatingsystem.service.StudentService;
+import com.fasterxml.jackson.databind.ObjectMapper; // ❗ 引入 Jackson ObjectMapper
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -17,12 +18,14 @@ import java.util.Optional;
 public class ClassroomController {
 
     private final ClassroomService classroomService;
-    private final StudentService studentService; // 用于获取班级学生数量
+    private final StudentService studentService;
+    private final ObjectMapper objectMapper; // ❗ 注入 ObjectMapper
 
     @Autowired
-    public ClassroomController(ClassroomService classroomService, StudentService studentService) {
+    public ClassroomController(ClassroomService classroomService, StudentService studentService, ObjectMapper objectMapper) {
         this.classroomService = classroomService;
         this.studentService = studentService;
+        this.objectMapper = objectMapper; // 初始化 ObjectMapper
     }
 
     /**
@@ -36,15 +39,14 @@ public class ClassroomController {
         }
 
         try {
-            // 设置当前老师为班级所有者
             newClassroom.setTeacherId(teacherId);
 
             // 默认设置一个空的座位布局，后续在排座功能中更新
             if (newClassroom.getSeatLayout() == null || newClassroom.getSeatLayout().isEmpty()) {
-                newClassroom.setSeatLayout("{\"rows\": 0, \"cols\": 0, \"layout\": []}");
+                newClassroom.setSeatLayout("{\"rows\": 0, \"cols\": 0}"); // 简化布局JSON
             }
 
-            classroomService.save(newClassroom); // 使用 save 方法保存或更新
+            classroomService.save(newClassroom);
 
             redirectAttributes.addFlashAttribute("successMessage", "班级 [" + newClassroom.getName() + "] 创建成功！");
         } catch (RuntimeException e) {
@@ -74,37 +76,48 @@ public class ClassroomController {
 
         Classroom classroom = optionalClassroom.get();
 
-        // 权限校验：确保该班级属于当前登录的老师
         if (!classroom.getTeacherId().equals(userId)) {
             redirectAttributes.addFlashAttribute("errorMessage", "无权访问此班级。");
             return "redirect:/home";
         }
 
-        // 【修正点 1】：确保 rowSpacing 和 colSpacing 字段非空，以防止 Thymeleaf 渲染时对 null Integer 尝试进行操作而导致的 500 错误。
-        // 对于数据库中新增字段为 NULL 的老班级数据尤其重要。
-        if (classroom.getRowSpacing() == null) {
-            classroom.setRowSpacing(15);
-        }
-        if (classroom.getColSpacing() == null) {
-            classroom.setColSpacing(15);
+        // 核心修复 1: 预处理 JSON 数据，避免 Thymeleaf SpEL 错误
+        int layoutRows = 0;
+        int layoutCols = 0;
+
+        if (classroom.getSeatLayout() != null && !classroom.getSeatLayout().isEmpty()) {
+            try {
+                // 使用 ObjectMapper 安全地解析 JSON 字符串
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Integer> layoutMap = objectMapper.readValue(classroom.getSeatLayout(), java.util.Map.class);
+                layoutRows = layoutMap.getOrDefault("rows", 0);
+                layoutCols = layoutMap.getOrDefault("cols", 0);
+            } catch (Exception e) {
+                // 如果解析失败，可以在 Model 中添加错误信息
+                model.addAttribute("errorMessage", "座位布局数据错误，请重新设置。");
+            }
         }
 
-        // 获取该班级的学生数量（用于前端展示，尽管在 home.html 中实现更方便）
-        int studentCount = 0; // 默认设置为 0
 
+        // 核心修复 2: 确保 RowSpacing 和 ColSpacing 字段非空
+        if (classroom.getRowSpacing() == null) { classroom.setRowSpacing(15); }
+        if (classroom.getColSpacing() == null) { classroom.setColSpacing(15); }
+
+        // 获取该班级的学生数量
+        int studentCount = 0;
         try {
-            // 保留上次添加的 try-catch，以增强数据访问的健壮性
             studentCount = studentService.getActiveStudentsByClassId(classId).size();
         } catch (Exception e) {
-            // 如果获取学生数量失败，设置错误消息并继续加载页面
             model.addAttribute("errorMessage", "获取学生人数失败，排座功能可能受到影响。错误详情: " + e.getMessage());
         }
 
         model.addAttribute("classroom", classroom);
         model.addAttribute("studentCount", studentCount);
+        // ❗ 传递预先解析好的行/列数
+        model.addAttribute("layoutRows", layoutRows);
+        model.addAttribute("layoutCols", layoutCols);
+
 
         return "class_detail"; // 返回班级详情模板
     }
-
-    // TODO: 可以在这里添加 editClassroom 和 deleteClassroom 方法
 }

@@ -68,9 +68,7 @@ public class SeatingArrangementServiceImpl implements SeatingArrangementService 
         }
     }
 
-    /**
-     * 核心算法：生成随机座位排布
-     */
+
     /**
      * 核心算法：生成随机座位排布
      */
