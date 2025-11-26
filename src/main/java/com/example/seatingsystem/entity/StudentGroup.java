@@ -25,5 +25,26 @@ public class StudentGroup {
     @Column(name = "create_time", updatable = false)
     private LocalDateTime createTime;
 
-    // --- 构造函数, Getters and Setters (省略) ---
+    // --- 构造函数 ---
+    public StudentGroup() {}
+
+    // --- Getters and Setters ---
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getClassId() { return classId; }
+    public void setClassId(Long classId) { this.classId = classId; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getStudentIds() { return studentIds; }
+    public void setStudentIds(String studentIds) { this.studentIds = studentIds; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public LocalDateTime getCreateTime() { return createTime; }
+    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
+
+    // --- JPA 生命周期回调 ---
+    @PrePersist
+    protected void onCreate() {
+        this.createTime = LocalDateTime.now();
+    }
 }
