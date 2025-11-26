@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.ui.Model;
 
 import java.util.List;
+import jakarta.servlet.http.HttpServletResponse; // ❗ 修复：新增导入
+import java.io.ByteArrayOutputStream; // ❗ 修复：新增导入
+import java.io.OutputStream; // ❗ 修复：新增导入
 
 @Controller
 @RequestMapping("/seating")
@@ -23,21 +26,20 @@ public class SeatingController {
 
     /**
      * 处理设置布局请求 (POST /seating/layout/update)
-     * ❗ 核心修正：返回 JSON 数据，让前端 AJAX 渲染空座位图。
+     * ❗ 核心修正：使用 JSON 配置参数。
      */
     @PostMapping("/layout/update")
     @ResponseBody // ❗ 关键：返回 JSON 数据
     public SeatingResult updateLayout(@RequestParam Long classId,
                                       @RequestParam int rows,
                                       @RequestParam int cols,
-                                      @RequestParam int rowSpacing,
-                                      @RequestParam int colSpacing) {
+                                      @RequestParam String rowSpacingConfigJson, // 修正为 JSON 字符串
+                                      @RequestParam String colSpacingConfigJson) { // 修正为 JSON 字符串
 
-        // 1. 调用 Service 逻辑，保存布局和间距信息 (Service 负责验证座位数是否足够)
-        seatingArrangementService.updateLayout(classId, rows, cols, rowSpacing, colSpacing);
+        // 1. 调用 Service 逻辑，保存布局和间距信息
+        seatingArrangementService.updateLayout(classId, rows, cols, rowSpacingConfigJson, colSpacingConfigJson);
 
-        // 2. 返回空的布局结构，让前端 AJAX 接收并渲染空白座位网格
-        // 假设 SeatingArrangementService 中已新增 generateEmptyLayout 方法
+        // 2. 返回空的布局结构
         return seatingArrangementService.generateEmptyLayout(classId, rows, cols);
     }
 
@@ -47,7 +49,6 @@ public class SeatingController {
     @GetMapping("/arrange/{classId}")
     @ResponseBody
     public SeatingResult getRandomArrangement(@PathVariable Long classId) {
-        // 实际应用中应检查用户权限
         return seatingArrangementService.randomArrange(classId);
     }
 
@@ -75,6 +76,44 @@ public class SeatingController {
             return "{\"success\": true}";
         } catch (RuntimeException e) {
             return "{\"success\": false, \"message\": \"" + e.getMessage() + "\"}";
+        }
+    }
+
+    /**
+     * 新增：导出当前座位布局为 PDF
+     * 允许前端通过 fileName 参数传递自定义文件名
+     */
+    @GetMapping("/exportPdf/{classId}")
+    public void exportSeatingToPdf(@PathVariable Long classId,
+                                   @RequestParam(required = false) String fileName, // 接收可选文件名
+                                   HttpServletResponse response) {
+        try {
+            // 1. 调用 Service 生成 PDF 数据
+            ByteArrayOutputStream os = seatingArrangementService.exportSeatingToPdf(classId);
+
+            // 2. 确定文件名
+            String finalFilename = (fileName != null && !fileName.isEmpty() ? fileName : "SeatingArrangement_" + classId) + ".pdf";
+
+            // 3. 配置 HTTP 响应头
+            response.setContentType("application/pdf");
+            // 使用 attachment 确保浏览器触发下载而不是预览
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + new String(finalFilename.getBytes("UTF-8"), "ISO8859-1") + "\"");
+            response.setContentLength(os.size());
+
+            // 4. 将 PDF 数据写入响应流
+            OutputStream out = response.getOutputStream();
+            os.writeTo(out);
+            out.flush();
+        } catch (RuntimeException e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            try {
+                response.getWriter().write("Error: " + e.getMessage());
+            } catch (Exception ignored) { /* Ignored */ }
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            try {
+                response.getWriter().write("Internal Server Error: PDF generation failed. Details: " + e.getMessage());
+            } catch (Exception ignored) { /* Ignored */ }
         }
     }
 }

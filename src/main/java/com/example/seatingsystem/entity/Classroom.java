@@ -22,11 +22,11 @@ public class Classroom {
     @Column(name = "seat_layout", columnDefinition = "TEXT")
     private String seatLayout; // 座位布局配置（JSON 字符串）
 
-    // ❗ 新增：行间距和列间距字段
-    @Column(name = "row_spacing")
-    private Integer rowSpacing;
-    @Column(name = "col_spacing")
-    private Integer colSpacing;
+    // ❗ 修改：移除旧的 Integer 间距字段，改为存储 JSON 配置
+    @Column(name = "row_spacing_config", columnDefinition = "TEXT")
+    private String rowSpacingConfig;
+    @Column(name = "col_spacing_config", columnDefinition = "TEXT")
+    private String colSpacingConfig;
 
     @Column(name = "create_time", updatable = false)
     private LocalDateTime createTime;
@@ -52,11 +52,18 @@ public class Classroom {
     public String getSeatLayout() { return seatLayout; }
     public void setSeatLayout(String seatLayout) { this.seatLayout = seatLayout; }
 
-    // ❗ 新增：间距 Getter/Setter
-    public Integer getRowSpacing() { return rowSpacing; }
-    public void setRowSpacing(Integer rowSpacing) { this.rowSpacing = rowSpacing; }
-    public Integer getColSpacing() { return colSpacing; }
-    public void setColSpacing(Integer colSpacing) { this.colSpacing = colSpacing; }
+    // ❗ 新增：间距配置 Getter/Setter
+    public String getRowSpacingConfig() { return rowSpacingConfig; }
+    public void setRowSpacingConfig(String rowSpacingConfig) { this.rowSpacingConfig = rowSpacingConfig; }
+    public String getColSpacingConfig() { return colSpacingConfig; }
+    public void setColSpacingConfig(String colSpacingConfig) { this.colSpacingConfig = colSpacingConfig; }
+
+    // ❗ 兼容性方法 (返回默认值 15，以便在前端修改前不报错)
+    public Integer getRowSpacing() { return 15; }
+    public void setRowSpacing(Integer rowSpacing) { /* 忽略设置 */ }
+    public Integer getColSpacing() { return 15; }
+    public void setColSpacing(Integer colSpacing) { /* 忽略设置 */ }
+
 
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }

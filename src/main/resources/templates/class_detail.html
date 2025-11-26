@@ -15,21 +15,20 @@
         /* CSS Grid 布局和间距控制 */
         .seating-grid {
             display: grid;
-            grid-template-columns: repeat(var(--cols), 1fr);
-            grid-row-gap: var(--row-gap, 15px);
-            grid-column-gap: var(--col-gap, 15px);
             margin: 20px auto;
             padding: 20px;
             border: 1px solid #ccc;
             background-color: #fff;
             border-radius: 10px;
+            column-gap: 0;
         }
         .seat-cell {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            min-height: 80px;
+            width: 80px;      /* 固定宽度 */
+            height: 80px;     /* 固定高度 */
             border-radius: 8px;
             cursor: grab;
             transition: transform 0.2s, box-shadow 0.2s;
@@ -38,6 +37,8 @@
             font-weight: bold;
             padding: 5px;
             font-size: 0.9em;
+            overflow: hidden;
+            /* grid-column 将在 JS 中动态设置 */
         }
         .sortable-chosen {
             border: 2px solid orange !important;
@@ -53,6 +54,27 @@
             margin-bottom: 20px;
             border-radius: 5px;
             font-size: 1.2em;
+        }
+
+        /* 间距调整模态框样式 */
+        .spacing-slider-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .spacing-label {
+            width: 150px;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+        .spacing-slider {
+            flex-grow: 1;
+            margin: 0 10px;
+        }
+        .spacing-value {
+            width: 50px;
+            text-align: right;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -80,7 +102,6 @@
                 <a href="#" class="list-group-item list-group-item-action active">座位排布</a>
                 <a th:href="@{/class/{id}/students(id=${classroom.id})}" class="list-group-item list-group-item-action">学生信息管理</a>
                 <a th:href="@{/class/{id}/groups(id=${classroom.id})}" class="list-group-item list-group-item-action">分组策略管理</a>
-                <a th:href="@{/seating/records/{id}(id=${classroom.id})}" class="list-group-item list-group-item-action">排座历史记录</a>
             </div>
         </div>
 
@@ -89,12 +110,13 @@
                 <div class="card-header bg-primary text-white">
                     当前座位布局
                     <button class="btn btn-sm btn-light float-right ml-2" id="btnSaveArrangement">保存排座</button>
+                    <button class="btn btn-sm btn-success float-right ml-2" id="btnExportPdf">导出 PDF</button>
                     <button class="btn btn-sm btn-warning float-right" id="btnRandomArrange">随机排座</button>
+                    <button class="btn btn-sm btn-success float-right mr-3" id="btnColSpacing" data-toggle="modal" data-target="#colSpacingModal" disabled>列间距调整</button>
                     <button class="btn btn-sm btn-info float-right mr-3" data-toggle="modal" data-target="#layoutModal">设置布局</button>
                 </div>
                 <div class="card-body" id="seatingArea" style="min-height: 500px; background-color: #eee; padding: 0;">
-                    <div class="lecture-desk">讲台 / Blackboard</div>
-                    <div id="seatingGridContainer">
+                    <div id="seatingGridContainer" style="overflow-x: auto;">
                         <h4 class="text-center text-muted mt-5">请先设置布局或点击随机排座</h4>
                     </div>
                 </div>
@@ -110,7 +132,7 @@
                 <h5 class="modal-title" id="layoutModalLabel">设置座位布局</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
-            <form th:action="@{/seating/layout/update}" method="post">
+            <form id="layoutForm">
                 <div class="modal-body">
                     <input type="hidden" name="classId" th:value="${classroom.id}">
 
@@ -127,20 +149,59 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="rowSpacing">行间距 (像素)</label>
-                        <input type="number" class="form-control" id="rowSpacing" name="rowSpacing" th:value="${classroom.rowSpacing != null ? classroom.rowSpacing : 15}" min="5" required>
+                        <label for="defaultSpacing">默认间距 (像素)</label>
+                        <input type="number" class="form-control" id="defaultSpacing" value="15" min="5" required>
+                        <small class="form-text text-muted">所有行/列的基础间距。</small>
                     </div>
-                    <div class="form-group">
-                        <label for="colSpacing">列间距 (像素)</label>
-                        <input type="number" class="form-control" id="colSpacing" name="colSpacing" th:value="${classroom.colSpacing != null ? classroom.colSpacing : 15}" min="5" required>
-                    </div>
+
+                    <input type="hidden" id="rowSpacingConfigJson" name="rowSpacingConfigJson" th:value="${rowSpacingConfig}">
+                    <input type="hidden" id="colSpacingConfigJson" name="colSpacingConfigJson" th:value="${colSpacingConfig}">
+
                     <p class="text-danger">当前班级有 <strong id="studentCountDisplay">[[${studentCount ?: 0}]]</strong> 位学生。</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                    <button type="submit" class="btn btn-primary">保存布局</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveLayout">保存布局</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="colSpacingModal" tabindex="-1" role="dialog" aria-labelledby="colSpacingModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="colSpacingModalLabel">列间距调整</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p>当前列数: <strong id="currentColsDisplay"></strong></p>
+                <div id="colSpacingSliders">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="btnSaveColSpacing">保存列间距</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="exitConfirmModal" tabindex="-1" role="dialog" aria-labelledby="exitConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exitConfirmModalLabel">退出警告</h5>
+            </div>
+            <div class="modal-body">
+                您有未保存的座位排布更改。是否在退出前保存当前排座？
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnExitNoSave">不保存并退出</button>
+                <button type="button" class="btn btn-primary" id="btnExitSave">保存并退出</button>
+                <button type="button" class="btn btn-info" data-dismiss="modal">取消</button>
+            </div>
         </div>
     </div>
 </div>
@@ -149,41 +210,295 @@
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
 
 <script th:inline="javascript">
     /*<![CDATA[*/
-    // 假设 Controller 已经正确传入 layoutRows 和 layoutCols
     const classId = [[${classroom.id}]];
     const seatingGridContainer = $('#seatingGridContainer');
 
-    // --- 渲染逻辑 ---
+    const layoutUpdateUrl = "/seating/layout/update";
+    const latestArrangementJson = /*[[${latestArrangementJson}]]*/;
+    let layoutRows = parseInt(/*[[${layoutRows}]]*/ || 0);
+    let layoutCols = parseInt(/*[[${layoutCols}]]*/ || 0);
+    const DEFAULT_SPACING = 15;
+
+    // 假设这是从后端获取的班级所有学生列表 (Thymeleaf注入)
+    // ❗ 注意：这个变量在新的修复方案中不再用于创建顺序布局，因为我们总是读取当前排座。
+    const allStudentsJson = /*[[${allStudentsJson}]]*/ || '[]';
+    // const allStudents = JSON.parse(allStudentsJson);
+
+    // 跟踪布局是否有未保存的更改
+    let isLayoutDirty = false;
+
+    if (layoutCols > 1) {
+        $('#btnColSpacing').prop('disabled', false);
+    }
+
+    $(document).ready(function() {
+        if (layoutRows > 0 && layoutCols > 0) {
+            if (latestArrangementJson && latestArrangementJson !== "{}") {
+                try {
+                    const latestArrangement = JSON.parse(latestArrangementJson);
+                    renderSeatingGrid(latestArrangement);
+                    console.log("Loaded latest saved seating arrangement.");
+                } catch (e) {
+                    console.error("Failed to parse latest arrangement JSON, falling back to empty layout.", e);
+                    // 初始加载失败时，尝试加载空布局
+                    manualLayoutSubmit($('#btnSaveLayout'), true);
+                }
+            } else {
+                // 如果没有保存的排座，则加载空布局
+                manualLayoutSubmit($('#btnSaveLayout'), true);
+            }
+        }
+
+        // 核心修复：拦截所有退出链接 (假设退出链接包含 /logout)
+        // 使用 document 委托确保能捕获所有点击事件
+        $(document).on('click', 'a[href*="/logout"]', function(e) {
+            if (isLayoutDirty) {
+                e.preventDefault();
+                // 存储目标 URL
+                $('#exitConfirmModal').data('target-url', this.href);
+                $('#exitConfirmModal').modal('show');
+            }
+        });
+
+        // Modal - 不保存并退出
+        $('#btnExitNoSave').click(function() {
+            isLayoutDirty = false; // 清除标志位，允许跳转
+            const targetUrl = $('#exitConfirmModal').data('target-url');
+            window.location.href = targetUrl;
+        });
+
+        // Modal - 保存并退出
+        $('#btnExitSave').click(function() {
+            const btn = $(this);
+            const originalText = btn.text();
+            btn.prop('disabled', true).text('正在保存...');
+
+            saveAndExit(btn, originalText);
+        });
+    });
+
+
+    // --- 动态生成列间距滑块 (保持不变) ---
+    function generateColSpacingSliders(cols, configJson) {
+        const slidersContainer = $('#colSpacingSliders');
+        slidersContainer.empty();
+        $('#currentColsDisplay').text(cols);
+
+        if (cols <= 1) {
+            slidersContainer.html('<p class="text-muted">列数少于2，无需调整间距。</p>');
+            return;
+        }
+
+        const currentConfig = JSON.parse(configJson || "{}");
+        let html = '';
+        const defaultPx = parseInt($('#defaultSpacing').val()) || DEFAULT_SPACING;
+
+        for (let c = 1; c < cols; c++) {
+            const spacingKey = c.toString();
+            const currentSpacing = currentConfig[spacingKey] || defaultPx;
+
+            html += `
+                <div class="spacing-slider-group">
+                    <span class="spacing-label">列 ${c} 和 ${c+1} 间距:</span>
+                    <input type="range" class="custom-range spacing-slider"
+                           min="5" max="100" step="1"
+                           value="${currentSpacing}" data-col-index="${c}">
+                    <span class="spacing-value badge badge-primary">${currentSpacing}px</span>
+                </div>
+            `;
+        }
+        slidersContainer.html(html);
+
+        $('.spacing-slider').on('input', function() {
+            const slider = $(this);
+            slider.next('.spacing-value').text(slider.val() + 'px');
+        });
+    }
+
+    // --- 列间距 Modal 打开事件 (保持不变) ---
+    $('#colSpacingModal').on('show.bs.modal', function () {
+        layoutCols = parseInt($('#cols').val());
+        const initialColConfig = $('#colSpacingConfigJson').val();
+        generateColSpacingSliders(layoutCols, initialColConfig);
+    });
+
+    // --- 保存列间距按钮事件 (修改：保存后不清除排座) ---
+    $('#btnSaveColSpacing').click(function() {
+        const btn = $(this);
+        const newColConfig = {};
+        let needsUpdate = false;
+
+        $('#colSpacingSliders .spacing-slider').each(function() {
+            const slider = $(this);
+            const index = String(slider.data('col-index'));
+            const value = parseInt(slider.val());
+            newColConfig[index] = value;
+            needsUpdate = true;
+        });
+
+        const newColConfigJson = JSON.stringify(newColConfig);
+        $('#colSpacingConfigJson').val(newColConfigJson);
+        $('#colSpacingModal').modal('hide');
+
+        if (needsUpdate) {
+            // 保存列间距后，调用 layout update API 并附带当前排座
+            manualLayoutSubmit(btn, false, true); // 传递 true 表示是 ColSpacing 更新
+        }
+    });
+
+    /**
+     * 布局保存逻辑 (通用函数)
+     * 核心修复：总是将当前排座数据发送给后端，并在成功后用最新的布局配置和这些排座数据重新渲染。
+     * @param {jQuery} targetBtn - 触发保存的按钮
+     * @param {boolean} isSilentUpdate - 是否为静默更新
+     * @param {boolean} isSpacingUpdate - 是否为间距更新 (不需要重新收集 seats，因为它们在 collectCurrentLayout 中已包含)
+     */
+    function manualLayoutSubmit(targetBtn = $('#btnSaveLayout'), isSilentUpdate = false, isSpacingUpdate = false) {
+        const url = layoutUpdateUrl;
+        const rows = $('#rows').val();
+        const cols = $('#cols').val();
+        const rowConfigJson = $('#rowSpacingConfigJson').val() || "{}";
+        const colConfigJson = $('#colSpacingConfigJson').val() || "{}";
+
+        // 核心：收集当前的排座数据
+        const currentLayoutData = collectCurrentLayout();
+
+        try {
+            JSON.parse(rowConfigJson);
+            JSON.parse(colConfigJson);
+        } catch (error) {
+            alert('间距配置的 JSON 格式错误，请检查。');
+            targetBtn.prop('disabled', false).text(targetBtn.data('original-text') || '保存布局');
+            return false;
+        }
+
+        // 构造发送给后端的 FormData
+        const formData = {
+            classId: classId,
+            rows: rows,
+            cols: cols,
+            rowSpacingConfigJson: rowConfigJson,
+            colSpacingConfigJson: colConfigJson,
+            // ❗ 附加当前排座数据到布局更新请求中
+            currentArrangementJson: JSON.stringify(currentLayoutData.layout)
+        };
+
+        const originalText = targetBtn.data('original-text') || targetBtn.text();
+        targetBtn.data('original-text', originalText);
+
+        if (!isSilentUpdate) {
+            targetBtn.prop('disabled', true).text('保存中...');
+        }
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: formData,
+            dataType: 'json',
+            success: function(response) {
+                layoutRows = response.rows;
+                layoutCols = response.cols;
+                $('#btnColSpacing').prop('disabled', layoutCols <= 1);
+
+                // 核心修复：无论是布局还是间距更新，我们都使用当前的排座数据
+                // 结合后端返回的最新配置（间距/行列数）进行渲染
+                const updatedResult = {
+                    rows: layoutRows,
+                    cols: layoutCols,
+                    // 渲染时使用当前的排座数据
+                    layout: currentLayoutData.layout
+                };
+
+                // 确保隐藏字段中的配置是最新的（如果后端没有返回）
+                if (response.rowSpacingConfig) $('#rowSpacingConfigJson').val(response.rowSpacingConfig);
+                if (response.colSpacingConfig) $('#colSpacingConfigJson').val(response.colSpacingConfig);
+
+
+                renderSeatingGrid(updatedResult);
+
+                // 布局/间距保存成功，清除 dirty 标志
+                isLayoutDirty = false;
+
+                if (!isSilentUpdate) {
+                    alert('布局保存成功！');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = '保存失败，请检查行/列数是否小于学生总数。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = '保存失败: ' + xhr.responseJSON.message;
+                } else if (xhr.responseText) {
+                    errorMsg = '保存失败，服务器返回了意外错误，请检查布局设置。';
+                }
+                alert(errorMsg);
+            },
+            complete: function() {
+                if (!isSilentUpdate) {
+                    targetBtn.prop('disabled', false).text(originalText);
+                }
+            }
+        });
+    }
+
+    // --- 布局 Modal 提交事件 (保持不变) ---
+    $('#layoutForm').submit(function(e) {
+        e.preventDefault();
+        manualLayoutSubmit($('#btnSaveLayout'), false);
+        $('#layoutModal').modal('hide');
+    });
+
+    // --- 渲染逻辑 (已修复：Grid 轨道 + 手动定位) ---
     function renderSeatingGrid(result) {
         seatingGridContainer.empty();
 
         const rows = result.rows;
         const cols = result.cols;
+        const defaultPx = parseInt($('#defaultSpacing').val()) || DEFAULT_SPACING;
 
-        // 从输入框中获取最新的间距值，确保实时渲染效果
-        const rowSpacing = $('#rowSpacing').val() || 20;
-        const colSpacing = $('#colSpacing').val() || 20;
+        // 获取并解析间距配置 (从隐藏字段读取最新值)
+        let rowConfig = {};
+        let colConfig = {};
 
-        // 动态设置 CSS 变量
-        let gridHtml = '<div class="seating-grid"' +
-            'style="--cols: ' + cols + ';' +
-            '--row-gap: ' + rowSpacing + 'px;' +
-            '--col-gap: ' + colSpacing + 'px;">';
+        try {
+            const rowJson = $('#rowSpacingConfigJson').val();
+            const colJson = $('#colSpacingConfigJson').val();
+            rowConfig = JSON.parse(rowJson || "{}");
+            colConfig = JSON.parse(colJson || "{}");
+        } catch (e) {
+            console.error("Failed to parse spacing config, using defaults", e);
+        }
+
+        // 1. 构建 Grid 容器 (使用 CSS Grid 布局)
+        let gridHtml = '<div class="seating-grid" id="actualSeatingGrid">';
+
+        // 2. 添加讲台
+        gridHtml += '<div class="lecture-desk">讲台 / Blackboard</div>';
+
+        // 3. 添加座位单元格
+        const seatLayoutMap = new Map();
+        if (result.layout) {
+            result.layout.forEach(p => {
+                seatLayoutMap.set(`${p.row}-${p.col}`, p);
+            });
+        }
 
         for (let r = 1; r <= rows; r++) {
             for (let c = 1; c <= cols; c++) {
-                // 查找当前座位分配的学生
-                const position = result.layout.find(p => p.row === r && p.col === c);
+                const position = seatLayoutMap.get(`${r}-${c}`) || { studentId: 0, studentName: '空座', gender: '空' };
 
-                const studentName = position && position.studentName ? position.studentName : '空座';
-                const gender = position && position.gender ? position.gender : '空';
-                const studentId = position && position.studentId ? position.studentId : 0;
+                const studentName = position.studentName || '空座';
+                const gender = position.gender || '空';
+                const studentId = position.studentId || 0;
 
-                // 单元格结构 (拖拽对象)
+                // 核心修复点 A: 计算并设置 grid-column 属性
+                const gridColumnStart = (c * 2) - 1;
+
                 gridHtml += `<div class="seat-cell gender-${gender}"
+                          style="grid-column: ${gridColumnStart};"
                           data-row="${r}" data-col="${c}" data-id="${studentId}"
                           data-gender="${gender}" data-name="${studentName}">
                             ${studentName}
@@ -194,36 +509,118 @@
         gridHtml += '</div>';
         seatingGridContainer.html(gridHtml);
 
-        // 激活拖拽功能 (SortableJS)
-        new Sortable(document.querySelector('.seating-grid'), {
+        // 4. 动态设置 Grid 模板 CSS 样式 (核心修复)
+        const actualGrid = document.getElementById('actualSeatingGrid');
+
+        // 4.1. 核心修复点 B: 动态构建 grid-template-columns 字符串 (Seat Track + Gutter Track)
+        let templateColumns = '';
+
+        for (let c = 1; c <= cols; c++) {
+            // 1. 添加当前 Seat Track 的宽度 (80px)
+            templateColumns += '80px';
+
+            if (c < cols) {
+                // 2. 如果不是最后一列，添加它右侧的 Gutter Track 的宽度
+                const key = String(c);
+                const spacingValue = colConfig[key] !== undefined ? parseInt(colConfig[key]) : defaultPx;
+
+                templateColumns += ` ${spacingValue}px`;
+            }
+
+            if (c < cols) {
+                templateColumns += ' ';
+            }
+        }
+
+        actualGrid.style.setProperty('grid-template-columns', templateColumns.trim());
+
+
+        // 4.2. 设置 Row Gap (行间距)
+        let rowGapValue = defaultPx;
+        if (rows > 1 && rowConfig["1"] !== undefined) {
+            rowGapValue = rowConfig["1"];
+        }
+        actualGrid.style.setProperty('row-gap', `${rowGapValue}px`);
+
+
+        // 4.3. 移除 Column Gap (间距已通过轨道定义，必须为 0)
+        actualGrid.style.setProperty('column-gap', '0');
+
+
+        // 5. 初始化 SortableJS
+        let dragTargetCell = null;
+
+        new Sortable(actualGrid, {
             animation: 150,
             draggable: '.seat-cell',
+            onMove: function(evt) {
+                dragTargetCell = evt.related;
+                return false;
+            },
             onEnd: function (evt) {
-                alert('座位已交换！请点击 "保存排座" 按钮进行保存。');
-                // TODO: 真正的保存逻辑需要在点击保存按钮时实现
+                const source = evt.item;
+
+                if (!dragTargetCell) return;
+
+                // 交换内容逻辑 (保持不变)
+                const targetData = {
+                    id: dragTargetCell.dataset.id,
+                    name: dragTargetCell.dataset.name,
+                    gender: dragTargetCell.dataset.gender,
+                };
+
+                dragTargetCell.dataset.id = source.dataset.id;
+                dragTargetCell.dataset.name = source.dataset.name;
+                dragTargetCell.dataset.gender = source.dataset.gender;
+                dragTargetCell.className = dragTargetCell.className.replace(/gender-(男|女|空)/, `gender-${source.dataset.gender}`);
+                dragTargetCell.innerHTML = `${source.dataset.name} <small>(${dragTargetCell.dataset.row}-${dragTargetCell.dataset.col})</small>`;
+
+                source.dataset.id = targetData.id;
+                source.dataset.name = targetData.name;
+                source.dataset.gender = targetData.gender;
+                source.className = source.className.replace(/gender-(男|女|空)/, `gender-${targetData.gender}`);
+                source.innerHTML = `${targetData.name} <small>(${source.dataset.row}-${source.dataset.col})</small>`;
+
+                console.log('座位已交换，请点击 "保存排座" 按钮进行保存。');
+
+                // 核心修复：拖拽完成后设置 dirty 标志
+                isLayoutDirty = true;
+                dragTargetCell = null;
             }
         });
 
-        // 实现不规则座位：双击删除座位框
+
+        // 6. 修正双击删除逻辑：设为空座
         document.querySelectorAll('.seat-cell').forEach(cell => {
             cell.addEventListener('dblclick', function() {
-                // 修正：增加不能删除空座的逻辑
                 if (this.dataset.id === '0' || this.dataset.id === '') {
-                    alert('不能删除空座或未分配座位的单元格。');
+                    alert('此座位已是空座。');
                     return;
                 }
-                if (confirm('确定要删除这个座位 (' + this.dataset.row + '-' + this.dataset.col + ') 吗？')) {
-                    this.remove();
-                    alert('座位已删除，请记得保存布局。');
-                    // TODO: 在这里更新全局布局变量，用于保存时的提交
+                if (confirm('确定要将该座位 (' + this.dataset.row + '-' + this.dataset.col + ') 设为空座吗？这将释放该学生。')) {
+
+                    this.dataset.id = 0;
+                    this.dataset.name = '空座';
+                    this.dataset.gender = '空';
+
+                    this.className = this.className.replace(/gender-(男|女|空)/, `gender-空`);
+                    this.innerHTML = `空座 <small>(${this.dataset.row}-${this.dataset.col})</small>`;
+
+                    alert('座位已设为空座，请记得保存排座。');
+                    // 核心修复：双击删除后设置 dirty 标志
+                    isLayoutDirty = true;
                 }
             });
         });
     }
 
-    // --- 随机排座按钮点击事件 ---
+    // --- 随机排座按钮点击事件 (修改：成功后设置 dirty 标志) ---
     $('#btnRandomArrange').click(function() {
-        // 禁用按钮并显示加载中
+        if (layoutRows === 0 || layoutCols === 0) {
+            alert('请先设置行数和列数。');
+            return;
+        }
+
         $(this).prop('disabled', true).text('正在排座...');
 
         $.ajax({
@@ -234,6 +631,8 @@
                 if (response && response.layout) {
                     renderSeatingGrid(response);
                     alert('随机排座完成！');
+                    // 核心修复：随机排座成功后设置 dirty 标志
+                    isLayoutDirty = true;
                 } else {
                     alert('排座失败：后端返回数据格式错误。');
                 }
@@ -249,14 +648,145 @@
         });
     });
 
-    // --- 保存排座逻辑 (待实现) ---
+    // --- 辅助函数：保存并退出 ---
+    function saveAndExit(btn, originalText) {
+        const currentLayout = collectCurrentLayout();
+        const seats = currentLayout.layout;
+        const recordName = "自动保存 - " + new Date().toLocaleString('zh-CN', { hour12: false });
+
+        const result = { rows: currentLayout.rows, cols: currentLayout.cols, layout: seats };
+        const targetUrl = $('#exitConfirmModal').data('target-url');
+
+        $.ajax({
+            url: '/seating/save/' + classId + '?recordName=' + encodeURIComponent(recordName),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(result),
+            dataType: 'json',
+            success: function(response) {
+                isLayoutDirty = false;
+                $('#exitConfirmModal').modal('hide');
+                window.location.href = targetUrl; // 保存成功后跳转
+            },
+            error: function(xhr) {
+                alert('保存失败，将不保存并退出。');
+                isLayoutDirty = false;
+                window.location.href = targetUrl; // 失败后仍退出
+            },
+            complete: function() {
+                btn.prop('disabled', false).text(originalText);
+            }
+        });
+    }
+
+    // --- 收集当前布局数据辅助函数 (保持不变) ---
+    function collectCurrentLayout() {
+        const seatingGrid = document.querySelector('.seating-grid');
+        // 核心修复：如果没有 Grid，返回当前已知的行列信息和空布局
+        if (!seatingGrid) return { rows: layoutRows, cols: layoutCols, layout: [] };
+
+        const seats = seatingGrid.querySelectorAll('.seat-cell');
+        const layout = [];
+
+        seats.forEach(seat => {
+            layout.push({
+                row: parseInt(seat.dataset.row),
+                col: parseInt(seat.dataset.col),
+                studentId: seat.dataset.id && seat.dataset.id !== '0' ? parseInt(seat.dataset.id) : null,
+                studentName: seat.dataset.id && seat.dataset.id !== '0' ? seat.dataset.name : null,
+                gender: seat.dataset.id && seat.dataset.id !== '0' ? seat.dataset.gender : null,
+            });
+        });
+
+        return { rows: layoutRows, cols: layoutCols, layout: layout };
+    }
+
+    // --- 保存排座逻辑 (修改：成功后清除 dirty 标志) ---
     $('#btnSaveArrangement').click(function() {
-        alert('请实现保存排座逻辑！');
-        // TODO: 实现收集布局数据，并 POST 到 /seating/save/{classId}
+        const currentLayout = collectCurrentLayout();
+        const seats = currentLayout.layout;
+
+        if (seats.length === 0 || currentLayout.rows === 0 || currentLayout.cols === 0) {
+            alert('没有座位布局，请先设置布局。');
+            return;
+        }
+
+        const recordName = prompt("请输入本次排座记录的名称:", "手动调整排座 - " + new Date().toLocaleDateString());
+        if (!recordName) return;
+
+        const result = {
+            rows: currentLayout.rows,
+            cols: currentLayout.cols,
+            layout: seats
+        };
+
+        const btn = $(this);
+        const originalText = btn.text();
+        btn.prop('disabled', true).text('保存中...');
+
+        $.ajax({
+            url: '/seating/save/' + classId + '?recordName=' + encodeURIComponent(recordName),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(result),
+            dataType: 'json',
+
+            success: function(response) {
+                if (response.success) {
+                    alert('保存排座成功！');
+                    // 核心修复：手动保存成功后清除 dirty 标志
+                    isLayoutDirty = false;
+                } else {
+                    alert('保存失败: ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : '保存失败，请检查网络或后端错误。';
+                alert('保存失败: ' + errorMsg);
+            },
+            complete: function() {
+                btn.prop('disabled', false).text(originalText);
+            }
+        });
     });
+
+    // --- 导出 PDF 按钮点击事件 (保持不变) ---
+    $('#btnExportPdf').click(function() {
+        if (layoutRows === 0 || layoutCols === 0) {
+            alert('请先设置布局或保存排座记录。');
+            return;
+        }
+
+        const btn = $(this);
+        const originalText = btn.text();
+        btn.prop('disabled', true).text('生成中...');
+
+        const defaultName = "座位安排_" + new Date().toLocaleDateString().replace(/\//g, '-');
+        const filename = prompt("请输入导出的文件名 (无需后缀):", defaultName);
+
+        if (!filename) {
+            btn.prop('disabled', false).text(originalText);
+            return;
+        }
+
+        const exportUrl = '/seating/exportPdf/' + classId + '?fileName=' + encodeURIComponent(filename);
+
+        window.open(exportUrl, '_blank');
+
+        setTimeout(function() {
+            btn.prop('disabled', false).text(originalText);
+        }, 2000);
+    });
+
+    // 禁用浏览器的 beforeunload 默认弹窗，我们使用 click 拦截和自定义 Modal
+    window.onbeforeunload = function() {
+        if (isLayoutDirty) {
+            // 返回非空字符串会触发浏览器默认警告，但我们主要依赖 click 拦截。
+            return "您有未保存的更改。";
+        }
+    };
 
     /*]]>*/
 </script>
-
 </body>
 </html>

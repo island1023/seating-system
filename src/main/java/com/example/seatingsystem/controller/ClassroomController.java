@@ -3,15 +3,21 @@ package com.example.seatingsystem.controller;
 import com.example.seatingsystem.entity.Classroom;
 import com.example.seatingsystem.service.ClassroomService;
 import com.example.seatingsystem.service.StudentService;
-import com.fasterxml.jackson.databind.ObjectMapper; // ❗ 引入 Jackson ObjectMapper
+import com.example.seatingsystem.service.SeatingArrangementService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import com.example.seatingsystem.model.SeatingResult;
 
 import java.util.Optional;
+// Removed: jakarta.servlet.http.HttpServletResponse
+// Removed: java.io.ByteArrayOutputStream
+// Removed: java.io.OutputStream
+
 
 @Controller
 @RequestMapping("/class") // 设置顶级路径
@@ -19,13 +25,18 @@ public class ClassroomController {
 
     private final ClassroomService classroomService;
     private final StudentService studentService;
-    private final ObjectMapper objectMapper; // ❗ 注入 ObjectMapper
+    private final ObjectMapper objectMapper;
+    private final SeatingArrangementService seatingArrangementService;
 
     @Autowired
-    public ClassroomController(ClassroomService classroomService, StudentService studentService, ObjectMapper objectMapper) {
+    public ClassroomController(ClassroomService classroomService,
+                               StudentService studentService,
+                               ObjectMapper objectMapper,
+                               SeatingArrangementService seatingArrangementService) {
         this.classroomService = classroomService;
         this.studentService = studentService;
-        this.objectMapper = objectMapper; // 初始化 ObjectMapper
+        this.objectMapper = objectMapper;
+        this.seatingArrangementService = seatingArrangementService;
     }
 
     /**
@@ -44,6 +55,14 @@ public class ClassroomController {
             // 默认设置一个空的座位布局，后续在排座功能中更新
             if (newClassroom.getSeatLayout() == null || newClassroom.getSeatLayout().isEmpty()) {
                 newClassroom.setSeatLayout("{\"rows\": 0, \"cols\": 0}"); // 简化布局JSON
+            }
+
+            // ❗ 新增：为新的间距配置字段设置默认值（空 JSON 字符串）
+            if (newClassroom.getRowSpacingConfig() == null) {
+                newClassroom.setRowSpacingConfig("{}");
+            }
+            if (newClassroom.getColSpacingConfig() == null) {
+                newClassroom.setColSpacingConfig("{}");
             }
 
             classroomService.save(newClassroom);
@@ -99,9 +118,28 @@ public class ClassroomController {
         }
 
 
-        // 核心修复 2: 确保 RowSpacing 和 ColSpacing 字段非空
-        if (classroom.getRowSpacing() == null) { classroom.setRowSpacing(15); }
-        if (classroom.getColSpacing() == null) { classroom.setColSpacing(15); }
+        // 核心修正 2: 获取自定义间距配置，如果为空则设为默认空 JSON 字符串 "{}"
+        String rowSpacingConfig = classroom.getRowSpacingConfig() != null && !classroom.getRowSpacingConfig().isEmpty()
+                ? classroom.getRowSpacingConfig() : "{}";
+        String colSpacingConfig = classroom.getColSpacingConfig() != null && !classroom.getColSpacingConfig().isEmpty()
+                ? classroom.getColSpacingConfig() : "{}";
+
+        // ❗ 新增：获取最新的排座结果
+        Optional<SeatingResult> latestArrangement = seatingArrangementService.getLatestArrangement(classId);
+
+        // ❗ 传递最新的排座结果 (如果存在)
+        if (latestArrangement.isPresent()) {
+            // 将 SeatingResult 转换为 JSON 字符串传递给前端，确保前端能直接使用
+            try {
+                String arrangementJson = objectMapper.writeValueAsString(latestArrangement.get());
+                model.addAttribute("latestArrangementJson", arrangementJson); // 传递完整的布局数据
+            } catch (Exception e) {
+                model.addAttribute("errorMessage", "加载最近排座记录失败。");
+                model.addAttribute("latestArrangementJson", "{}");
+            }
+        } else {
+            model.addAttribute("latestArrangementJson", "{}"); // 传递空 JSON 字符串
+        }
 
         // 获取该班级的学生数量
         int studentCount = 0;
@@ -116,6 +154,9 @@ public class ClassroomController {
         // ❗ 传递预先解析好的行/列数
         model.addAttribute("layoutRows", layoutRows);
         model.addAttribute("layoutCols", layoutCols);
+        // ❗ 传递新的间距配置 JSON
+        model.addAttribute("rowSpacingConfig", rowSpacingConfig);
+        model.addAttribute("colSpacingConfig", colSpacingConfig);
 
 
         return "class_detail"; // 返回班级详情模板
