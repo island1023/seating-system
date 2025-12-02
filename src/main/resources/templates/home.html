@@ -57,7 +57,23 @@
                     <a th:href="@{/class/{classId}(classId=${classroom.id})}" class="btn btn-sm btn-success">
                         进入管理
                     </a>
-                    <button class="btn btn-sm btn-outline-secondary float-right">编辑</button>
+
+                    <!-- 【修改点 1】编辑按钮 - 触发编辑模态框 -->
+                    <button class="btn btn-sm btn-outline-secondary float-right ml-2 edit-btn"
+                            data-toggle="modal"
+                            data-target="#editClassModal"
+                            th:attr="data-class-id=${classroom.id}, data-class-name=${classroom.name}, data-class-desc=${classroom.description}">
+                        编辑
+                    </button>
+
+                    <!-- 【修改点 2】删除按钮 - 触发删除确认模态框 -->
+                    <button class="btn btn-sm btn-outline-danger float-right delete-btn"
+                            data-toggle="modal"
+                            data-target="#deleteConfirmModal"
+                            th:attr="data-class-id=${classroom.id}, data-class-name=${classroom.name}">
+                        删除
+                    </button>
+
                 </div>
                 <div class="card-footer text-muted">
                     创建时间: <span th:text="${#temporals.format(classroom.createTime, 'yyyy-MM-dd')}"></span>
@@ -67,6 +83,7 @@
     </div>
 </div>
 
+<!-- 【模态框 1】添加新班级 Modal -->
 <div class="modal fade" id="addClassModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -95,8 +112,93 @@
     </div>
 </div>
 
+<!-- 【模态框 2】新增：编辑班级 Modal -->
+<div class="modal fade" id="editClassModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑班级</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <form id="editClassForm" th:action="@{/class/update}" method="post">
+                <div class="modal-body">
+                    <!-- 隐藏字段：用于传递班级ID -->
+                    <input type="hidden" name="id" id="editClassId">
+                    <input type="hidden" name="teacherId" th:value="${currentUser.id}">
+
+                    <div class="form-group">
+                        <label for="editClassName">班级名称</label>
+                        <input type="text" class="form-control" id="editClassName" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editClassDesc">班级描述</label>
+                        <textarea class="form-control" id="editClassDesc" name="description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 【模态框 3】新增：删除确认 Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">删除班级确认</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p>您确定要删除班级 <strong id="deleteClassName"></strong> 吗？</p>
+                <p class="text-danger small">警告：删除班级会同时尝试删除所有相关的学生和排座记录。如果操作失败，请先手动清空学生和记录。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <!-- 链接将由 JS 动态设置 href -->
+                <a href="#" class="btn btn-danger" id="confirmDeleteLink">确认删除</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script th:inline="javascript">
+    // 【JS 逻辑 1】处理编辑按钮点击事件，填充模态框
+    document.querySelectorAll('.edit-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const classId = this.getAttribute('data-class-id');
+            const className = this.getAttribute('data-class-name');
+            const classDesc = this.getAttribute('data-class-desc');
+
+            document.getElementById('editClassId').value = classId;
+            document.getElementById('editClassName').value = className;
+            // Thymeleaf 表达式转换后，null 或空字符串会保持原样
+            document.getElementById('editClassDesc').value = classDesc === 'null' ? '' : classDesc;
+        });
+    });
+
+    // 【JS 逻辑 2】处理删除按钮点击事件，填充删除确认模态框
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const classId = this.getAttribute('data-class-id');
+            const className = this.getAttribute('data-class-name');
+
+            // 填充删除确认模态框
+            document.getElementById('deleteClassName').textContent = className;
+
+            // 动态设置确认删除链接 (使用 Thymeleaf 表达式构建基础 URL)
+            const deleteUrl = [[@{/class/delete/}]] + classId;
+            document.getElementById('confirmDeleteLink').href = deleteUrl;
+        });
+    });
+</script>
 </body>
 </html>

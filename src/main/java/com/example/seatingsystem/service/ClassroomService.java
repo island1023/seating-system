@@ -23,5 +23,9 @@ public interface ClassroomService {
      */
     Optional<Classroom> findById(Long id);
 
-    // 更多方法如 deleteClass, updateClassLayout 等待后续添加...
+    // 【新增】更新班级名称和描述
+    Classroom updateClassroom(Classroom classroom);
+
+    // 【新增】删除班级
+    void deleteClassroom(Long classId);
 }

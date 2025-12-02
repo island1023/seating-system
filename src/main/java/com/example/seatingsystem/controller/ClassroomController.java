@@ -14,9 +14,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.example.seatingsystem.model.SeatingResult;
 
 import java.util.Optional;
-// Removed: jakarta.servlet.http.HttpServletResponse
-// Removed: java.io.ByteArrayOutputStream
-// Removed: java.io.OutputStream
 
 
 @Controller
@@ -160,5 +157,59 @@ public class ClassroomController {
 
 
         return "class_detail"; // 返回班级详情模板
+    }
+    /**
+     * 【新增】处理更新班级信息请求 (POST /class/update)
+     */
+    @PostMapping("/update")
+    public String updateClassroom(@ModelAttribute Classroom classroom, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        if (teacherId == null) {
+            return "redirect:/login";
+        }
+
+        try {
+            // 确保用户有权修改（尽管 Service 层会通过 ID 校验）
+            Optional<Classroom> existing = classroomService.findById(classroom.getId());
+            if (existing.isEmpty() || !existing.get().getTeacherId().equals(teacherId)) {
+                redirectAttributes.addFlashAttribute("errorMessage", "无权修改此班级。");
+                return "redirect:/home";
+            }
+
+            classroomService.updateClassroom(classroom);
+            redirectAttributes.addFlashAttribute("successMessage", "班级 [" + classroom.getName() + "] 修改成功！");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "修改班级失败：" + e.getMessage());
+        }
+
+        return "redirect:/home";
+    }
+
+
+    /**
+     * 【新增】处理删除班级请求 (GET /class/delete/{classId})
+     */
+    @GetMapping("/delete/{classId}")
+    public String deleteClassroom(@PathVariable Long classId, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        if (teacherId == null) {
+            return "redirect:/login";
+        }
+
+        try {
+            // 权限校验
+            Optional<Classroom> existing = classroomService.findById(classId);
+            if (existing.isEmpty() || !existing.get().getTeacherId().equals(teacherId)) {
+                redirectAttributes.addFlashAttribute("errorMessage", "无权删除此班级或班级不存在。");
+                return "redirect:/home";
+            }
+
+            classroomService.deleteClassroom(classId);
+            redirectAttributes.addFlashAttribute("successMessage", "班级已删除！");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+
+        return "redirect:/home";
     }
 }
